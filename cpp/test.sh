@@ -43,7 +43,7 @@ test_encode_decode() {
     echo "Verifying integrity..."
     if diff "$TEMP_INPUT" "$TEMP_DECODED" &> /dev/null; then
         echo "Test PASSED: Decoded numbers match the original input."
-        cleanup
+        #cleanup
     else
         echo "Test FAILED: Decoded numbers do not match the original input."
         exit 1
