@@ -13,7 +13,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 NUM_COUNT=$1
-MAX_BITS=12
+MAX_BITS=63
 TEMP_INPUT="input_nums.txt"
 TEMP_ENCODED="encoded.bin"
 TEMP_DECODED="decoded_nums.txt"

@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            auto bytes = irradix::encode(nums);
+            auto bytes = irradix::l1encode(nums);
             std::cout.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 
             if (verbose) {
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
                                              std::istreambuf_iterator<char>());
             }
 
-            auto nums = irradix::decode(bytes);
+            auto nums = irradix::l1decode(bytes);
             for (size_t i = 0; i < nums.size(); ++i) {
                 if (i > 0) std::cout << ",";
                 std::cout << nums[i];

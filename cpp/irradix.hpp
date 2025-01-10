@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <iostream>
 #include <sstream>
+#include <bit>
 
 namespace irradix {
 
@@ -53,7 +54,7 @@ std::string irradix(uint64_t num) {
 //   - pad left with zeros to a multiple of 8 bits
 //   - chunk into bytes
 // ---------------------------------------------------------------------
-inline std::vector<uint8_t> encode(const std::vector<uint64_t>& nums, bool bits=false) {
+inline std::vector<uint8_t> encode(const std::vector<uint64_t>& nums, bool bits=false, std::string* bitStr = nullptr) {
   std::string concatenated;
   // Build string of base-PHI reps joined by DELIMITER
   for (size_t i = 0; i < nums.size(); i++) {
@@ -61,10 +62,8 @@ inline std::vector<uint8_t> encode(const std::vector<uint64_t>& nums, bool bits=
     std::string rep = irradix(mappedNum);
 
     // If rep ends with "10", append "0101"
-    if (i < nums.size() - 1) {
-      if (rep.size() >= 2 && rep.compare(rep.size() - 2, 2, "10") == 0) {
-        rep += "0101";
-      }
+    if (rep.size() >= 2 && rep.compare(rep.size() - 2, 2, "10") == 0) {
+      rep += "0101";
     }
 
     if (i > 0 && i < nums.size()) {
@@ -80,6 +79,10 @@ inline std::vector<uint8_t> encode(const std::vector<uint64_t>& nums, bool bits=
   // Left-pad with zeros:
   std::string padded(padLen, '0');
   padded += concatenated;
+
+  if ( bits ) {
+    *bitStr = padded;
+  }
 
   std::vector<uint8_t> result;
   result.reserve((padded.size() + 7) / 8);
@@ -98,7 +101,7 @@ inline std::vector<uint8_t> encode(const std::vector<uint64_t>& nums, bool bits=
 //   - Split on "101"
 //   - For each piece, call derradix and do ((val // 2) - 1) to invert the encode
 // ---------------------------------------------------------------------
-inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks, bool bits=false) {
+inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks) {
   // Reconstruct the bit string
   std::string reconstructed;
   reconstructed.reserve(chunks.size() * 8);
@@ -109,8 +112,6 @@ inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks, bool bit
     reconstructed += bitsVal.to_string();
   }
 
-  // For bits==false, remove leading zeros
-  // (But watch out for the corner case of all zeros => find_first_not_of returns npos)
   size_t firstOne = reconstructed.find_first_not_of('0');
   if (firstOne == std::string::npos) {
     // Means everything is '0'
@@ -136,6 +137,10 @@ inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks, bool bit
     }
 
     parts.push_back(part);
+    if ( pos + DELIMITER.size() == reconstructed.size() ) {
+      std::string empty;
+      parts.push_back(empty);
+    }
   }
 
   for( auto i = 0; i < parts.size(); i++ ) {
@@ -144,7 +149,7 @@ inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks, bool bit
       part = part.substr(0, part.size()-1);
       i++;
     }
-    //std::cout << "Part: " << part << std::endl;
+    //std::cerr << "Part: " << part << std::endl;
     numbers.push_back((derradix(part)>>1)-1);
   }
 
@@ -161,7 +166,7 @@ inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks, bool bit
 inline std::vector<uint8_t> l1encode(const std::vector<uint64_t>& nums) {
   // Step 1: gather lengths and build the big "numsBits"
   std::string numsBits;
-  numsBits.reserve(nums.size() * 10); // just an estimate
+  numsBits.reserve(nums.size() * 64); // just an estimate
 
   std::vector<uint64_t> lengths;
   lengths.reserve(nums.size());
@@ -170,23 +175,21 @@ inline std::vector<uint8_t> l1encode(const std::vector<uint64_t>& nums) {
   // But your alternative does it differently, so let's keep it simpler:
   // We'll do a direct base-PHI rep, measure size of that rep, store it in 'lengths', then append rep to numsBits
   for (auto n : nums) {
-    uint64_t mappedNum = (n + 1ULL) * 2ULL;
-    std::string rep = irradix(mappedNum);
-    lengths.push_back(rep.size());
-    numsBits += rep;
+    unsigned w = std::bit_width(n);
+    if ( n == 0 ) {
+      w = 1;
+    }
+    //std::cerr << "Bit width: " << w << std::endl;
+    lengths.push_back(w);
+
+    std::bitset<64> b(n);
+    std::string bits = b.to_string();
+    numsBits += bits.substr(64 - w);
   }
 
-  // Step 2: encode lengths with bits=true
-  std::vector<uint8_t> encodedLengthsBits = encode(lengths, true);
-
-  // Convert that chunk data back into a bitstring
-  // (like your approach does with std::ostringstream etc.)
   std::string lengthsBits;
-  lengthsBits.reserve(encodedLengthsBits.size() * 8);
-  for (auto b : encodedLengthsBits) {
-    std::bitset<8> bs(b);
-    lengthsBits += bs.to_string();
-  }
+  lengthsBits.reserve(nums.size() * 8);
+  encode(lengths, true, &lengthsBits);
 
   // Step 3: Append L1_DELIMITER + numsBits
   std::string fullBitSequence = lengthsBits + L1_DELIMITER + numsBits;
@@ -230,6 +233,9 @@ inline std::vector<uint64_t> l1decode(const std::vector<uint8_t>& chunks) {
   std::string lengthsBits = fullSequence.substr(0, pos);
   std::string numsBits = fullSequence.substr(pos + L1_DELIMITER.size());
 
+  //std::cerr << "Lengths: " << lengthsBits << std::endl;
+  //std::cerr << "Nums: " << numsBits << std::endl;
+
   // Step 3: parse lengthsBits as “bits = true”
   // Convert lengthsBits into a vector<uint8_t>
   std::vector<uint8_t> lengthChunks;
@@ -238,7 +244,13 @@ inline std::vector<uint64_t> l1decode(const std::vector<uint8_t>& chunks) {
     std::bitset<8> chunkBits(lengthsBits.substr(i, 8));
     lengthChunks.push_back(static_cast<uint8_t>(chunkBits.to_ulong()));
   }
-  std::vector<uint64_t> lengths = decode(lengthChunks, true); // returns a vector<uint64_t>
+  std::vector<uint64_t> lengths = decode(lengthChunks); // returns a vector<uint64_t>
+
+  /*
+  for ( auto n : lengths ) {
+    std::cerr << "Length: " << n << std::endl;
+  }
+  */
 
   // Step 4: reconstruct the numbers from numsBits
   std::vector<uint64_t> results;
@@ -254,10 +266,8 @@ inline std::vector<uint64_t> l1decode(const std::vector<uint8_t>& chunks) {
     offset += len;
 
     // Convert from base-PHI => val
-    uint64_t val = derradix(part);
-    // Undo the ((n+1)*2)
-    val = (val / 2ULL) - 1ULL;
-    results.push_back(val);
+    std::bitset<64> bs(part);
+    results.push_back(bs.to_ullong());
   }
   return results;
 }
