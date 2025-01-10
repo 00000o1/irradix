@@ -25,7 +25,7 @@ $(TARGET): $(OBJECTS)
 
 # Clean up build artifacts
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(TARGET) ? *.txt *.bin
 
 # Run the tool with some default arguments (example usage)
 run: $(TARGET)

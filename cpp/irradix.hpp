@@ -56,16 +56,18 @@ std::string irradix(uint64_t num) {
 inline std::vector<uint8_t> encode(const std::vector<uint64_t>& nums, bool bits=false) {
   std::string concatenated;
   // Build string of base-PHI reps joined by DELIMITER
-  for (size_t i = 0; i < nums.size(); ++i) {
+  for (size_t i = 0; i < nums.size(); i++) {
     uint64_t mappedNum = (nums[i] + 1) << 1;  // Python's (num + 1)*2
     std::string rep = irradix(mappedNum);
 
     // If rep ends with "10", append "0101"
-    if (rep.size() >= 2 && rep.compare(rep.size() - 2, 2, "10") == 0) {
-      rep += "0101";
+    if (i < nums.size() - 1) {
+      if (rep.size() >= 2 && rep.compare(rep.size() - 2, 2, "10") == 0) {
+        rep += "0101";
+      }
     }
 
-    if (i > 0) {
+    if (i > 0 && i < nums.size()) {
       concatenated += DELIMITER;
     }
     concatenated += rep;
@@ -142,6 +144,7 @@ inline std::vector<uint64_t> decode(const std::vector<uint8_t>& chunks, bool bit
       part = part.substr(0, part.size()-1);
       i++;
     }
+    //std::cout << "Part: " << part << std::endl;
     numbers.push_back((derradix(part)>>1)-1);
   }
 
