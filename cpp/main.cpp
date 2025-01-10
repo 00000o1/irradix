@@ -9,6 +9,7 @@
 void printUsage(const std::string& programName) {
     std::cout << "Usage:\n"
               << "  " << programName << " encode <number>\n"
+              << "  " << programName << " decode <number>\n"
               << "  " << programName << " l1encode <num1,num2,...> [-vv]\n"
               << "  " << programName << " l1decode <filename>\n";
 }
@@ -60,7 +61,11 @@ int main(int argc, char* argv[]) {
     try {
         if (command == "encode") {
             uint64_t num = std::stoull(input);
-            std::cout << "Irradix Encoding: " << irradix::irradixEncode(num) << "\n";
+            std::cout << "Irradix Encoding: " << irradix::irradix(num) << "\n";
+
+        } else if (command == "decode") {
+            std::string rep = input;
+            std::cout << "Irradix Encoding: " << irradix::derradix(input) << "\n";
 
         } else if (command == "l1encode") {
             std::vector<uint64_t> nums;
