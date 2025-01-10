@@ -11,11 +11,12 @@ void printUsage(const std::string& programName) {
               << "  " << programName << " encode <number>\n"
               << "  " << programName << " decode <number>\n"
               << "  " << programName << " l1encode <num1,num2,...> [-vv]\n"
-              << "  " << programName << " l1decode <filename>\n";
+              << "  " << programName << " l1decode <filename>\n"
+              << "  " << programName << " l1encode (reads stdin if no input)\n"
+              << "  " << programName << " l1decode (reads stdin if no file)\n";
 }
 
 void calculateStats(const std::vector<uint64_t>& nums, size_t encodedSize) {
-    // Determine largest number to calculate baseline encoding size
     uint64_t maxNum = *std::max_element(nums.begin(), nums.end());
     size_t baselineSize = nums.size();
 
@@ -29,15 +30,13 @@ void calculateStats(const std::vector<uint64_t>& nums, size_t encodedSize) {
         baselineSize *= sizeof(uint64_t);
     }
 
-    // Calculate theoretical minimum size
     size_t theoreticalSize = 0;
     for (uint64_t num : nums) {
         size_t bitLength = static_cast<size_t>(std::log2(num) + 1);
         theoreticalSize += bitLength + static_cast<size_t>(std::log2(bitLength) + 1);
     }
-    theoreticalSize = (theoreticalSize + 7) / 8; // Convert bits to bytes
+    theoreticalSize = (theoreticalSize + 7) / 8;
 
-    // Calculate and print stats
     double compactionPercent = 100.0 * encodedSize / baselineSize;
     double expansionPercent = 100.0 * encodedSize / theoreticalSize;
 
@@ -48,14 +47,23 @@ void calculateStats(const std::vector<uint64_t>& nums, size_t encodedSize) {
     std::cerr << "Versus theoretical limit: " << expansionPercent << "%\n";
 }
 
+std::string readFromStdin() {
+    std::ostringstream oss;
+    std::string line;
+    while (std::getline(std::cin, line)) {
+        oss << line;
+    }
+    return oss.str();
+}
+
 int main(int argc, char* argv[]) {
-    if (argc < 3) {
+    if (argc < 2) {
         printUsage(argv[0]);
         return 1;
     }
 
     std::string command = argv[1];
-    std::string input = argv[2];
+    std::string input = (argc > 2) ? argv[2] : "";
     bool verbose = (argc > 3 && std::string(argv[3]) == "-vv");
 
     try {
@@ -65,15 +73,23 @@ int main(int argc, char* argv[]) {
 
         } else if (command == "decode") {
             std::string rep = input;
-            std::cout << "Irradix Encoding: " << irradix::derradix(input) << "\n";
+            std::cout << "Irradix Decoding: " << irradix::derradix(input) << "\n";
 
         } else if (command == "l1encode") {
             std::vector<uint64_t> nums;
-            std::istringstream iss(input);
-            std::string token;
-
-            while (std::getline(iss, token, ',')) {
-                nums.push_back(std::stoull(token));
+            if (input.empty()) {
+                std::string stdinInput = readFromStdin();
+                std::istringstream iss(stdinInput);
+                std::string token;
+                while (std::getline(iss, token, ',')) {
+                    nums.push_back(std::stoull(token));
+                }
+            } else {
+                std::istringstream iss(input);
+                std::string token;
+                while (std::getline(iss, token, ',')) {
+                    nums.push_back(std::stoull(token));
+                }
             }
 
             auto bytes = irradix::l1encode(nums);
@@ -84,24 +100,26 @@ int main(int argc, char* argv[]) {
             }
 
         } else if (command == "l1decode") {
-            std::ifstream file(input, std::ios::binary);
-            if (!file) {
-                throw std::runtime_error("Could not open file: " + input);
-            }
+            std::vector<uint8_t> bytes;
 
-            std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(file)),
-                                       std::istreambuf_iterator<char>());
+            if (input.empty()) {
+                std::string stdinInput = readFromStdin();
+                bytes = std::vector<uint8_t>(stdinInput.begin(), stdinInput.end());
+            } else {
+                std::ifstream file(input, std::ios::binary);
+                if (!file) {
+                    throw std::runtime_error("Could not open file: " + input);
+                }
+                bytes = std::vector<uint8_t>((std::istreambuf_iterator<char>(file)),
+                                             std::istreambuf_iterator<char>());
+            }
 
             auto nums = irradix::l1decode(bytes);
-            size_t i = 0;
-            for (uint64_t num : nums) {
-                i++;
-                if ( i == nums.size() ) {
-                  std::cout << num << "\n";
-                } else {
-                  std::cout << num << ",";
-                }
+            for (size_t i = 0; i < nums.size(); ++i) {
+                if (i > 0) std::cout << ",";
+                std::cout << nums[i];
             }
+            std::cout << "\n";
 
         } else {
             printUsage(argv[0]);

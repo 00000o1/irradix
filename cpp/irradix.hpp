@@ -14,7 +14,7 @@ namespace irradix {
 
 // We'll use a simple 'double' for PHI now, to match your simpler approach.
 // (If you need large numbers, consider 'long double' or a big-precision library.)
-static long double PHI = (1.0 + std::sqrt(5.0)) / 2.0;
+static long double PHI = (1.0L + std::sqrt(5.0L)) / 2.0L;
 
 // Delimiters
 static const std::string DELIMITER = "101";

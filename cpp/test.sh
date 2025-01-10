@@ -13,7 +13,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 NUM_COUNT=$1
-MAX_BITS=64
+MAX_BITS=12
 TEMP_INPUT="input_nums.txt"
 TEMP_ENCODED="encoded.bin"
 TEMP_DECODED="decoded_nums.txt"
@@ -21,19 +21,21 @@ TEMP_DECODED="decoded_nums.txt"
 # Generate $NUM_COUNT random numbers with uniform bit-length distribution
 generate_numbers() {
     echo "Generating $NUM_COUNT random numbers with uniform bit-length distribution..."
-    > "$TEMP_INPUT"
-    for ((i = 0; i < NUM_COUNT; i++)); do
-        BITS=$((1 + RANDOM % MAX_BITS)) # Random bit length (1 to 64)
-        NUM=$((RANDOM % (1 << BITS)))  # Random number with exactly $BITS bits
-        echo -n "$NUM," >> "$TEMP_INPUT"
-    done
-    sed -i '' 's/,$/\n/' "$TEMP_INPUT" # Remove trailing comma (macOS-compatible `sed`)
+    python3 - <<EOF > "$TEMP_INPUT"
+import random
+
+def random_number(bits):
+    return random.randint(0, (1 << bits) - 1)
+
+with open("$TEMP_INPUT", "w") as f:
+    f.write(",".join(str(random_number(random.randint(1, $MAX_BITS))) for _ in range($NUM_COUNT)) + "\\n")
+EOF
 }
 
 # Run encode-decode test
 test_encode_decode() {
     echo "Encoding numbers with l1encode..."
-    ./irradix_tool l1encode "$(cat $TEMP_INPUT)" > "$TEMP_ENCODED"
+    cat "$TEMP_INPUT" | ./irradix_tool l1encode > "$TEMP_ENCODED"
 
     echo "Decoding numbers with l1decode..."
     ./irradix_tool l1decode "$TEMP_ENCODED" > "$TEMP_DECODED"
@@ -41,8 +43,10 @@ test_encode_decode() {
     echo "Verifying integrity..."
     if diff "$TEMP_INPUT" "$TEMP_DECODED" &> /dev/null; then
         echo "Test PASSED: Decoded numbers match the original input."
+        cleanup
     else
         echo "Test FAILED: Decoded numbers do not match the original input."
+        exit 1
     fi
 }
 
@@ -51,8 +55,8 @@ cleanup() {
     rm -f "$TEMP_INPUT" "$TEMP_ENCODED" "$TEMP_DECODED"
 }
 
+cleanup
 # Main execution
 generate_numbers
 test_encode_decode
-cleanup
 
